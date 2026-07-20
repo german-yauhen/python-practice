@@ -1,4 +1,3 @@
-from random import Random
 from functools import reduce
 from hash_util import hash_block, hash_string_256
 from collections import OrderedDict
@@ -51,7 +50,7 @@ def load_data():
                 ]
                 restored_block = Block(
                     index=block["index"],
-                    previous_hash=block["previous_block_hash"],
+                    previous_hash=block["previous_hash"],
                     proof=block["proof"],
                     transactions=restored_txs,
                     timestamp=block["timestamp"],
@@ -185,14 +184,14 @@ def mine_block():
     """Creates a new block storing a hash of the formed block.
     Returns True if the operations succeds otherwise False"""
     last_block = blockchain[-1]
-    previous_block_hash = hash_block(last_block)
+    previous_hash = hash_block(last_block)
     proof = proof_of_work()
     reward_transaction = OrderedDict(
         [("sender", "MINING"), ("recipient", owner), ("amount", MINING_REWARD)]
     )
     copied_transactions = open_transactions[:]
     copied_transactions.append(reward_transaction)
-    new_block = Block(len(blockchain), previous_block_hash, copied_transactions, proof)
+    new_block = Block(len(blockchain), previous_hash, copied_transactions, proof)
     blockchain.append(new_block)
     print(f"The new block formed: {new_block}")
     return True
@@ -214,7 +213,7 @@ def pring_blockchain_elements():
 
 def verify_chain():
     """Verify the current blockchain and return True if it's validm False otherwise"""
-    for index, block in enumerate(blockchain):
+    for (index, block) in enumerate(blockchain):
         if index == 0:
             continue
         if block.previous_hash != hash_block(blockchain[index - 1]):
@@ -236,7 +235,6 @@ while input_is_active:
     print("1: Add a new transacton value.")
     print("2: Mine a new block")
     print("3: Output the blockchain blocks.")
-    print("h: Hack blockchain")
     print("q: Quit")
     user_choice = input("Your choice: ")
     if user_choice == "1":
@@ -262,6 +260,7 @@ while input_is_active:
             print("At least one open transaction is invalid")
     elif user_choice == "q" or user_choice == "Q":
         input_is_active = False
+        save_data()
     else:
         print(f"Wrong input: '{user_choice}'")
     if not verify_chain():
