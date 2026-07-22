@@ -3,13 +3,13 @@ from uuid import uuid4
 from blockchain import Blockchain
 from verification import Verification
 
-
+ 
 class Node:
 
     def __init__(self):
-        self.uuid = str(uuid4())
+        # self.uuid = str(uuid4())
+        self.uuid = "Eugene"
         self.blockchain = Blockchain(self.uuid)
-        self.verifier = Verification()
 
     def listen_for_input(self):
         input_is_active = True
@@ -29,7 +29,7 @@ class Node:
                         print("Added transaction")
                     else:
                         print("Transaction failed")
-                    print(self.blockchain.open_transactions)
+                    print(self.blockchain.get_open_transacitions())
                 except (IOError, ValueError):
                     print(f"Wrong input: '{user_choice}'")
                     input_is_active = False
@@ -38,8 +38,8 @@ class Node:
             elif user_choice == "3":
                 self.print_blockchain_elements()
             elif user_choice == "4":
-                if self.verifier.verify_transactions(
-                    self.blockchain.open_transactions, self.blockchain.get_balance
+                if Verification.verify_transactions(
+                    self.blockchain.get_open_transacitions(), self.blockchain.get_balance
                 ):
                     print("All open transactions are valid")
                 else:
@@ -49,7 +49,7 @@ class Node:
                 self.blockchain.save_data()
             else:
                 print(f"Wrong input: '{user_choice}'")
-            if not self.verifier.verify_chain(self.blockchain.chain):
+            if not Verification.verify_chain(self.blockchain.chain):
                 print("Blockchain is invalid!")
                 input_is_active = False
             print(
