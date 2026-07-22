@@ -1,7 +1,6 @@
 from functools import reduce
 from hash_util import hash_block
 import json
-import pickle
 from block import Block
 from transaction import Transaction
 from verification import Verification
@@ -12,24 +11,36 @@ MINING_REWARD = 10
 class Blockchain:
 
     def __init__(self, hosting_node_uuid):
-        self.verifier = Verification()
         self.chain = [Block(0, "", [], 10, 0)]
-        self.open_transactions = []
+        self.__open_transactions = []
         self.load_data()
         self.hosting_node_uuid = hosting_node_uuid
 
-    def _load_data_with_pickle(self):
-        with open("blockchain.p", mode="rb") as f:
-            file_content = pickle.loads(f.read())
-            global blockchain
-            global open_transactions
-            blockchain = file_content["chain"]
-            open_transactions = file_content["open_trxs"]
 
-    def _save_data_with_pickle(self):
-        with open("blockchain.p", mode="wb") as f:
-            data = {"chain": blockchain, "open_trxs": open_transactions}
-            f.write(pickle.dumps(data))
+    @property
+    def chain(self):
+        return self.__chain[:]
+
+    @chain.setter
+    def chain(self, val):
+        self.__chain = val
+
+
+    def get_open_transacitions(self):
+        return self.__open_transactions[:]
+
+    # def _load_data_with_pickle(self):
+    #     with open("blockchain.p", mode="rb") as f:
+    #         file_content = pickle.loads(f.read())
+    #         global blockchain
+    #         global open_transactions
+    #         blockchain = file_content["chain"]
+    #         open_transactions = file_content["open_trxs"]
+
+    # def _save_data_with_pickle(self):
+    #     with open("blockchain.p", mode="wb") as f:
+    #         data = {"chain": blockchain, "open_trxs": open_transactions}
+    #         f.write(pickle.dumps(data))
 
     def load_data(self):
         try:
@@ -59,7 +70,7 @@ class Blockchain:
                     open_transactions_restored.append(trx_restored)
 
                 self.chain = blockchain_restored
-                self.open_transactions = open_transactions_restored
+                self.__open_transactions = open_transactions_restored
         except (IOError, IndexError):
             pass
         finally:
@@ -81,22 +92,22 @@ class Blockchain:
                             block_elem.proof,
                             block_elem.timestamp,
                         )
-                        for block_elem in self.chain
+                        for block_elem in self.__chain
                     ]
                 ]
                 f.write(json.dumps(saveable_chain))
                 f.write("\n")
-                saveable_txs = [tx.__dict__ for tx in self.open_transactions]
+                saveable_txs = [tx.__dict__ for tx in self.__open_transactions]
                 f.write(json.dumps(saveable_txs))
         except IOError:
             print("Saving failed!")
 
     def proof_of_work(self):
-        last_block = self.chain[-1]
+        last_block = self.__chain[-1]
         hash_last_block = hash_block(last_block)
         proof = 0
-        while not self.verifier.valid_proof(
-            self.open_transactions, hash_last_block, proof
+        while not Verification.valid_proof(
+            self.__open_transactions, hash_last_block, proof
         ):
             proof += 1
         return proof
@@ -105,10 +116,10 @@ class Blockchain:
         participant = self.hosting_node_uuid
         sent_amounts = [
             [tx.amount for tx in block.transactions if tx.sender == participant]
-            for block in self.chain
+            for block in self.__chain
         ]
         sent_amounts_open = [
-            tx.amount for tx in self.open_transactions if tx.sender == participant
+            tx.amount for tx in self.__open_transactions if tx.sender == participant
         ]
         sent_amounts.append(sent_amounts_open)
         total_sent = reduce(
@@ -121,7 +132,7 @@ class Blockchain:
 
         received_amounts = [
             [tx.amount for tx in block.transactions if tx.recipient == participant]
-            for block in self.chain
+            for block in self.__chain
         ]
         total_received = reduce(
             lambda received_sum, received_amount: (
@@ -136,9 +147,9 @@ class Blockchain:
 
     def get_last_blockchain_value(self):
         """Returns the last value of the currrent blockhain."""
-        if len(self.chain) < 1:
+        if len(self.__chain) < 1:
             return None
-        return self.chain[-1]
+        return self.__chain[-1]
 
     def add_transaction(self, sender, recipient, amount=1.0):
         """Transfers coins from a sender to a recipient.
@@ -148,8 +159,8 @@ class Blockchain:
             :amount:    The amount of coint sent with the transaction (default = 1.0)
         """
         transaction = Transaction(sender, recipient, amount)
-        if self.verifier.verify_transaction(transaction, self.get_balance):
-            self.open_transactions.append(transaction)
+        if Verification.verify_transaction(transaction, self.get_balance):
+            self.__open_transactions.append(transaction)
             self.save_data()
             return True
         return False
@@ -157,15 +168,15 @@ class Blockchain:
     def mine_block(self):
         """Creates a new block storing a hash of the formed block.
         Returns True if the operations succeds otherwise False"""
-        last_block = self.chain[-1]
+        last_block = self.__chain[-1]
         previous_hash = hash_block(last_block)
         proof = self.proof_of_work()
         reward_transaction = Transaction("MINING", self.hosting_node_uuid, MINING_REWARD)
-        copied_transactions = self.open_transactions[:]
+        copied_transactions = self.__open_transactions[:]
         copied_transactions.append(reward_transaction)
-        new_block = Block(len(self.chain), previous_hash, copied_transactions, proof)
-        self.chain.append(new_block)
-        self.open_transactions = []
+        new_block = Block(len(self.__chain), previous_hash, copied_transactions, proof)
+        self.__chain.append(new_block)
+        self.__open_transactions = []
         self.save_data()
         print(f"The new block formed: {new_block}")
         return True
