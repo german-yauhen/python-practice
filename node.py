@@ -53,7 +53,7 @@ class Node:
                 print("Blockchain is invalid!")
                 input_is_active = False
             print(
-                "Balance of {}: {:6.2f}".format(self.uuid, self.blockchain.get_balance)
+                "Balance of {}: {:6.2f}".format(self.uuid, self.blockchain.get_balance())
             )
         else:
             print("Quitting...")
