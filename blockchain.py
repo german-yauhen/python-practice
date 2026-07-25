@@ -1,21 +1,22 @@
 from functools import reduce
-from hash_util import hash_block
+from utility.hash_util import hash_block
 import json
 from block import Block
 from transaction import Transaction
-from verification import Verification
+from utility.verification import Verification
+from wallet import Wallet
 
 MINING_REWARD = 10
 
 
 class Blockchain:
 
-    def __init__(self, hosting_node_uuid):
-        self.chain = [Block(0, "", [], 10, 0)]
+    def __init__(self, hosting_node):
+        gen_block = Block(0, "", [], 10, 0)
+        self.chain = [gen_block]
         self.__open_transactions = []
         self.load_data()
-        self.hosting_node_uuid = hosting_node_uuid
-
+        self.hosting_node = hosting_node
 
     @property
     def chain(self):
@@ -24,7 +25,6 @@ class Blockchain:
     @chain.setter
     def chain(self, val):
         self.__chain = val
-
 
     def get_open_transacitions(self):
         return self.__open_transactions[:]
@@ -50,7 +50,12 @@ class Blockchain:
                 blockchain_restored = []
                 for block in json.loads(file_content[0][:-1]):
                     restored_txs = [
-                        Transaction(trx["sender"], trx["recipient"], trx["amount"])
+                        Transaction(
+                            trx["sender"],
+                            trx["recipient"],
+                            trx["signature"],
+                            trx["amount"],
+                        )
                         for trx in block["transactions"]
                     ]
                     restored_block = Block(
@@ -61,20 +66,22 @@ class Blockchain:
                         timestamp=block["timestamp"],
                     )
                     blockchain_restored.append(restored_block)
+                self.chain = blockchain_restored
 
                 open_transactions_restored = []
                 for trx_read in json.loads(file_content[1]):
                     trx_restored = Transaction(
-                        trx_read["sender"], trx_read["recipient"], trx_read["amount"]
+                        trx_read["sender"],
+                        trx_read["recipient"],
+                        trx_read["signature"],
+                        trx_read["amount"],
                     )
                     open_transactions_restored.append(trx_restored)
-
-                self.chain = blockchain_restored
                 self.__open_transactions = open_transactions_restored
         except (IOError, IndexError):
             pass
         finally:
-            print("Loaded!")
+            print("Cleanup..!")
 
     # load_data()
     # load_data_with_pickle()
@@ -113,7 +120,7 @@ class Blockchain:
         return proof
 
     def get_balance(self):
-        participant = self.hosting_node_uuid
+        participant = self.hosting_node
         sent_amounts = [
             [tx.amount for tx in block.transactions if tx.sender == participant]
             for block in self.__chain
@@ -129,6 +136,7 @@ class Blockchain:
             sent_amounts,
             0,
         )
+        print(f"Total sent: {total_sent}")
 
         received_amounts = [
             [tx.amount for tx in block.transactions if tx.recipient == participant]
@@ -143,6 +151,7 @@ class Blockchain:
             received_amounts,
             0,
         )
+        print(f"Total received: {total_received}")
         return total_received - total_sent
 
     def get_last_blockchain_value(self):
@@ -151,14 +160,17 @@ class Blockchain:
             return None
         return self.__chain[-1]
 
-    def add_transaction(self, sender, recipient, amount=1.0):
+    def add_transaction(self, sender, recipient, signature, amount=1.0):
         """Transfers coins from a sender to a recipient.
         Arguments:
             :sender:    The sender of the coins
             :recipient: The recioient of the coins
+            :signature: The signature of the transaction
             :amount:    The amount of coint sent with the transaction (default = 1.0)
         """
-        transaction = Transaction(sender, recipient, amount)
+        if self.hosting_node == None:
+            return False
+        transaction = Transaction(sender, recipient, signature, amount)
         if Verification.verify_transaction(transaction, self.get_balance):
             self.__open_transactions.append(transaction)
             self.save_data()
@@ -168,11 +180,16 @@ class Blockchain:
     def mine_block(self):
         """Creates a new block storing a hash of the formed block.
         Returns True if the operations succeds otherwise False"""
+        if self.hosting_node == None:
+            return False
         last_block = self.__chain[-1]
         previous_hash = hash_block(last_block)
         proof = self.proof_of_work()
-        reward_transaction = Transaction("MINING", self.hosting_node_uuid, MINING_REWARD)
+        reward_transaction = Transaction("MINING", self.hosting_node, "", MINING_REWARD)
         copied_transactions = self.__open_transactions[:]
+        for trx in copied_transactions:
+            if not Wallet.verify_transaction(trx):
+                return False
         copied_transactions.append(reward_transaction)
         new_block = Block(len(self.__chain), previous_hash, copied_transactions, proof)
         self.__chain.append(new_block)
