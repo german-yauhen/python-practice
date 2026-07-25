@@ -1,5 +1,5 @@
 from utility.hash_util import hash_block, hash_string_256
-
+from wallet import Wallet
 
 class Verification:
 
@@ -11,7 +11,7 @@ class Verification:
             + str(proof)
         ).encode()
         guess_hash = hash_string_256(guess)
-        print(guess_hash)
+        # print(guess_hash)
         return guess_hash[0:2] == "00"
 
     @classmethod
@@ -31,9 +31,12 @@ class Verification:
 
     @classmethod
     def verify_transactions(cls, transactions, get_balance):
-        return all([cls.verify_transaction(tx, get_balance) for tx in transactions])
+        return all([cls.verify_transaction(tx, get_balance, False) for tx in transactions])
 
     @staticmethod
-    def verify_transaction(transaction, get_balance):
-        sender_balance = get_balance()
-        return sender_balance >= transaction.amount
+    def verify_transaction(transaction, get_balance, check_funds=True):
+        if check_funds:
+            sender_balance = get_balance()
+            return sender_balance >= transaction.amount and Wallet.verify_transaction(transaction)
+        else:
+            return Wallet.verify_transaction(transaction)
