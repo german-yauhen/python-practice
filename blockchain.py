@@ -120,6 +120,8 @@ class Blockchain:
         return proof
 
     def get_balance(self):
+        if self.hosting_node == None:
+            return None
         participant = self.hosting_node
         sent_amounts = [
             [tx.amount for tx in block.transactions if tx.sender == participant]
@@ -181,7 +183,7 @@ class Blockchain:
         """Creates a new block storing a hash of the formed block.
         Returns True if the operations succeds otherwise False"""
         if self.hosting_node == None:
-            return False
+            return None
         last_block = self.__chain[-1]
         previous_hash = hash_block(last_block)
         proof = self.proof_of_work()
@@ -189,11 +191,11 @@ class Blockchain:
         copied_transactions = self.__open_transactions[:]
         for trx in copied_transactions:
             if not Wallet.verify_transaction(trx):
-                return False
+                return None
         copied_transactions.append(reward_transaction)
         new_block = Block(len(self.__chain), previous_hash, copied_transactions, proof)
         self.__chain.append(new_block)
         self.__open_transactions = []
         self.save_data()
         print(f"The new block formed: {new_block}")
-        return True
+        return new_block
