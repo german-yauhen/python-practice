@@ -54,7 +54,7 @@ def create_keys():
     wallet.create_keys()
     if wallet.safe_keys():
         global blockchain
-        blockchain = Blockchain(wallet.public_key)
+        blockchain = Blockchain(wallet.public_key, port)
         response = {
             "public_key": wallet.public_key,
             "private_key": wallet.private_key,
@@ -105,11 +105,11 @@ def accept_transaction():
     if not all(required_field in trx_json for required_field in required_fields):
         return jsonify({"message": f"Required {required_fields} data is missing"}), 400
     success = blockchain.add_transaction(
-        trx_json["sender"],
-        trx_json["recipient"],
-        trx_json["amount"],
-        trx_json["signature"],
-        is_receiving=True
+        sender=trx_json["sender"],
+        recipient=trx_json["recipient"],
+        amount=trx_json["amount"],
+        signature=trx_json["signature"],
+        is_receiving=True,
     )
     if success:
         response = {
@@ -124,6 +124,27 @@ def accept_transaction():
         return jsonify(response), 201
     else:
         return jsonify({"message": "Creating a transaction failed"}), 500
+
+
+@app.route("/acceptance/block", methods=["POST"])
+def accept_block():
+    block_json = request.get_json();
+    if not block_json or "block" not in block_json:
+        return jsonify({"message": "No block data passed to accept"}), 400
+    block = block_json["block"]
+    if block["index"] == blockchain.chain[-1].index + 1:
+        if blockchain.add_block(block):
+            return jsonify({"message": "Block added"}), 201
+        else:
+            return jsonify({"message": "Block seems invalid"}), 500
+    elif block["index"] > blockchain.chain[-1].index:
+        print("Warning! XXXXXXX")
+        pass
+    else:
+        response = {
+            "message": "Blockchain seems to be shorter, block not added"
+        }
+        return jsonify(response), 409
 
 
 @app.route("/transaction", methods=["POST"])

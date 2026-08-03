@@ -186,8 +186,6 @@ class Blockchain:
             :amount:    The amount of coint sent with the transaction (default = 1.0)
         """
 
-        if self.public_key == None:
-            return False
         transaction = Transaction(sender, recipient, signature, amount)
         if Verification.verify_transaction(transaction, self.get_balance):
             self.__open_transactions.append(transaction)
@@ -232,8 +230,47 @@ class Blockchain:
         self.__chain.append(new_block)
         self.__open_transactions = []
         self.save_data()
+        for peer_node_id in self.__peer_nodes:
+            url = f"http://{peer_node_id}/acceptance/block"
+            converted_block = new_block.__dict__.copy()
+            converted_block["transactions"] = [trx.__dict__ for trx in converted_block["transactions"]]
+            try:
+                response = requests.post(url, json={"block": converted_block})
+                if response.status_code == 400 or response.status_code == 500:
+                    print("Block declined, needs resolving!")
+            except requests.exceptions.ConnectionError:
+                continue
         print(f"The new block formed: {new_block}")
         return new_block
+
+    def add_block(self, block):
+        transactions = [
+            Transaction(
+                trx["sender"], trx["recipient"], trx["signature"], trx["amount"]
+            )
+            for trx in block["transactions"]
+        ]
+        proof_is_valid = Verification.valid_proof(transactions[:-1], block["previous_hash"], block["proof"])
+        hashes_match = hash_block(self.chain[-1]) == block["previous_hash"]
+        if not proof_is_valid or not hashes_match:
+            return False
+        converted_block = Block(block["index"], block["previous_hash"], transactions, block["proof"], block["timestamp"])
+        self.__chain.append(converted_block)
+        open_trxs_copy = self.__open_transactions[:]
+        for in_trx in block["transactions"]:
+            for open_trx in open_trxs_copy:
+                if (
+                    open_trx.sender == in_trx["sender"]
+                    and open_trx.recipient == in_trx["recipient"]
+                    and open_trx.amount == in_trx["amount"]
+                    and open_trx.signature == in_trx["signature"]
+                ):
+                    try:
+                        self.__open_transactions.remove(open_trx)
+                    except ValueError:
+                        print("Item has been already removed")
+        self.save_data()
+        return True
 
     def add_peer_node(self, node):
         """Adds a new node to the peer node set
