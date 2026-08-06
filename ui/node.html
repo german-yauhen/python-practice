@@ -63,6 +63,19 @@
                     <h1>Manage your Blockchain</h1>
                 </div>
             </div>
+            <div class="row">
+                <div class="col">
+                    <ul class="nav nav-pills">
+                        <li class="nav-item">
+                            <a class="nav-link" href="/">Wallet &amp; Node</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="/network">Network</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <hr>
             <div v-if="error" class="alert alert-danger" role="alert">
                 {{ error }}
             </div>
@@ -144,6 +157,9 @@
                     <button class="btn btn-primary" @click="onLoadData">{{ view === 'chain' ? 'Load Blockchain' : 'Load Transactions' }}</button>
                     <button v-if="view === 'chain' && wallet" class="btn btn-success" @click="onMine">
                         Mine Coins
+                    </button>
+                    <button class="btn btn-warning" @click="onResolve">
+                        Resolve conflicts
                     </button>
                 </div>
             </div>
@@ -284,13 +300,15 @@
                     this.txLoading = true
                     var vm = this
                     axios.post('/transaction', {
-                        recipient: this.outgoingTx.recipient,
-                        amount: this.outgoingTx.amount
+                        recipient: vm.outgoingTx.recipient,
+                        amount: vm.outgoingTx.amount
                     })
                         .then(function (response) {
                             vm.error = null;
                             vm.success = response.data.message;
                             vm.funds = response.data.funds;
+                            vm.outgoingTx.recipient = '';
+                            vm.outgoingTx.amount = 0;
                             vm.txLoading = false;
                         })
                         .catch(function (error) {
@@ -306,6 +324,18 @@
                             vm.error = null;
                             vm.success = response.data.message;
                             vm.funds = response.data.funds;
+                        })
+                        .catch(function (error) {
+                            vm.success = null;
+                            vm.error = error.response.data.message;
+                        })
+                },
+                onResolve: function () {
+                    var vm = this
+                    axios.post('/conflicts/resolve')
+                        .then(function (response) {
+                            vm.error = null;
+                            vm.success = response.data.message;
                         })
                         .catch(function (error) {
                             vm.success = null;
