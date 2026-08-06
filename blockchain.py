@@ -20,6 +20,7 @@ class Blockchain:
         self.public_key = public_key
         self.__peer_nodes = set()
         self.node_id = node_id
+        self.resolve_conflicts = False
         self.load_data()
 
     @property
@@ -238,6 +239,8 @@ class Blockchain:
                 response = requests.post(url, json={"block": converted_block})
                 if response.status_code == 400 or response.status_code == 500:
                     print("Block declined, needs resolving!")
+                if response.status_code == 409:
+                    self.resolve_conflicts = True
             except requests.exceptions.ConnectionError:
                 continue
         print(f"The new block formed: {new_block}")
@@ -271,6 +274,48 @@ class Blockchain:
                         print("Item has been already removed")
         self.save_data()
         return True
+
+    def resolve(self):
+        winner_chain = self.chain
+        replaced = False
+        for peer_node_id in self.__peer_nodes:
+            url = f"http://{peer_node_id}/chain"
+            try:
+                rs = requests.get(url)
+                node_chain = rs.json()
+                node_chain = [
+                    Block(
+                        block["index"],
+                        block["previous_hash"],
+                        [
+                            Transaction(
+                                trx["sender"],
+                                trx["recipient"],
+                                trx["signature"],
+                                trx["amount"],
+                            )
+                            for trx in block["transactions"]
+                        ],
+                        block["proof"],
+                        block["timestamp"],
+                    )
+                    for block in node_chain
+                ]
+                node_chain_length = len(node_chain)
+                local_chain_length = len(winner_chain)
+                if node_chain_length > local_chain_length and Verification.verify_chain(node_chain):
+                    winner_chain = node_chain
+                    replaced = True
+            except requests.exceptions.ConnectionError:
+                print(f"Connection error with {peer_node_id}")
+                continue
+        self.resolve_conflicts = False
+        self.chain = winner_chain
+        if replaced:
+            self.__open_transactions = []
+        self.save_data()
+        return replaced
+
 
     def add_peer_node(self, node):
         """Adds a new node to the peer node set

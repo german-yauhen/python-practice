@@ -158,6 +158,9 @@
                     <button v-if="view === 'chain' && wallet" class="btn btn-success" @click="onMine">
                         Mine Coins
                     </button>
+                    <button class="btn btn-warning" @click="onResolve">
+                        Resolve conflicts
+                    </button>
                 </div>
             </div>
             <div class="row">
@@ -321,6 +324,18 @@
                             vm.error = null;
                             vm.success = response.data.message;
                             vm.funds = response.data.funds;
+                        })
+                        .catch(function (error) {
+                            vm.success = null;
+                            vm.error = error.response.data.message;
+                        })
+                },
+                onResolve: function () {
+                    var vm = this
+                    axios.post('/conflicts/resolve')
+                        .then(function (response) {
+                            vm.error = null;
+                            vm.success = response.data.message;
                         })
                         .catch(function (error) {
                             vm.success = null;
